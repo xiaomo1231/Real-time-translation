@@ -1,45 +1,59 @@
 # 实时翻译
 
-本地语音识别 + AI 翻译的桌面实时字幕工具，适合视频会议、网课和直播。中英互译，自动判断方向。
+本地语音识别 + AI 翻译的桌面实时翻译工具。适合视频会议、网课、直播、外服游戏和跨语言通话。
 
-- **识别在本机**：sherpa-onnx 流式模型边听边出字（0.5 秒内），一句话结束后用 SenseVoice 重新识别定稿。
-- **翻译用 DeepSeek**：定稿分句流式翻译，带上下文和术语表；可配置备用接口（任何 OpenAI 兼容接口）。
-- **悬浮字幕窗**：置顶、半透明、可拖动缩放，可选原文+译文 / 仅译文 / 仅原文。
-- **文字记录**：每次会话自动保存 TXT 和 SRT 字幕文件到 `data/transcripts`。
+- **听**：录系统声音或指定程序（游戏、Discord）的声音，sherpa-onnx 本地识别，DeepSeek 翻译，悬浮字幕显示。
+- **说**：按住快捷键说中文，松开后约 1–2.5 秒，英文语音从虚拟麦克风发给游戏 / Discord / Zoom。
+- **看聊天框**：框选游戏聊天区域，本地 OCR 识别新的外文消息并翻译。
+- **打字翻译**：快捷键弹出输入框，中文回车 → 英文复制到剪贴板（可选同时念出来）。
+- **场景**：托盘菜单一键切换「会议 / 游戏 / 跨语言通话 / 面对面」。
+- **文字记录**：每次会话自动保存 TXT 和 SRT 到 `data/transcripts`。
 
 ## Windows 使用
 
-1. 安装 Python 3.10 以上（推荐 3.12）。
-2. 双击 `setup.bat` 安装依赖（只需一次）。
-3. 双击 `start.bat` 启动。首次启动会让你填写 DeepSeek API Key，并自动下载识别模型（约 450 MB）。
-4. 屏幕下方出现字幕条：拖动移动，右下角缩放，右键打开菜单（暂停、设置、记录文件夹、退出）。托盘里也有同样的菜单。
-
-默认录制电脑正在播放的声音（WASAPI 回环，不需要虚拟声卡）。在「设置 → 音频」可以切换成麦克风：说中文会译成英文。
+1. 安装 Python 3.10–3.13（推荐 3.12）。
+2. 双击 `setup.bat` 安装依赖（更新代码后也要再运行一次）。
+3. 双击 `start.bat` 启动。首次启动填写 DeepSeek API Key，并自动下载模型（识别约 450 MB，语音约 80 MB）。
+4. 屏幕下方出现字幕条：拖动移动，右下角缩放，右键或托盘菜单里切换场景、打开设置。
 
 出问题时用 `debug.bat` 启动，可以看到报错信息。
 
-## macOS 使用
+### 说话转译（说中文，对方听到英文）
 
-macOS 录系统声音需要先安装 [BlackHole](https://github.com/ExistentialAudio/BlackHole) 并在「音频 MIDI 设置」里建一个包含 BlackHole 的多输出设备。之后双击 `start.command`。
+1. 安装免费的 [VB-CABLE](https://vb-audio.com/Cable/) 虚拟声卡，装完重启电脑。
+2. 在游戏 / Discord 的语音设置里，把**输入设备（麦克风）**设为 `CABLE Output`。
+3. 托盘菜单 → 场景 → 游戏（或「设置 → 说」里勾选开启）。
+4. 按住 **F8** 说中文，松开后对方会听到英文。字幕条上蓝色的「我：」是你说的话和发出去的英文。
 
-## 设置项
+说话键、麦克风、语速、是否在耳机里监听都可以在「设置 → 说」里改。
 
-| 页 | 内容 |
-| --- | --- |
-| 翻译 | API Key、接口地址、模型、备用接口、超时、参考上文句数 |
-| 音频 | 系统声音 / 麦克风，选择设备 |
-| 识别 | 档位（自动 / 高 / 低）、是否二次定稿、停顿多久算一句、线程数 |
-| 显示 | 显示内容、字号、背景不透明度、显示句数、是否保存记录 |
-| 术语表 | 每行 `原文=译文`，翻译时强制使用 |
+### 只听游戏和 Discord 的声音（Windows 11）
 
-所有设置保存在 `data/settings.json`，模型在 `data/models`。
+「设置 → 听」选「指定程序的声音」，从下拉框里添加正在发声的程序（如 `Discord.exe`、游戏的 exe）。留空则录除本程序外的全部声音。这个功能用 `bin/rtt-capture.exe`（源码在 `native/rtt-capture`），需要 Windows 11。
+
+### 游戏聊天框
+
+托盘菜单 →「框选聊天区域…」，拖出聊天框的范围。之后新出现的外文消息会翻译显示在旁边的小窗里。游戏需要设成**无边框窗口**，全屏独占模式下悬浮窗会被挡住。
+
+回复：按 **Ctrl+Alt+T** 打开打字翻译框，输入中文回车，英文自动复制，切回游戏 Ctrl+V。
+
+### 注意
+
+- 游戏如果以管理员身份运行，本程序也要用管理员身份运行，否则收不到 F8 等快捷键。
+- 本程序只截图和录音，不注入游戏进程、不自动打字。
+
+## macOS
+
+录系统声音、虚拟麦克风都用 [BlackHole](https://github.com/ExistentialAudio/BlackHole)：「设置 → 说 → 输出到」填 `BlackHole`。按程序录音只支持 Windows。双击 `start.command` 启动。
 
 ## 开发
 
 ```
 python -m venv .venv && .venv/bin/pip install -r requirements.txt
-python tests/asr_smoke.py <wav>...       # 只测识别
-python tests/pipeline_smoke.py <wav>...  # 识别 + 翻译 + 记录（读取 data/settings.json 里的 API Key）
+python tests/asr_smoke.py <wav>...        # 只测识别
+python tests/pipeline_smoke.py <wav>...   # 听：识别 + 翻译 + 记录
+python tests/speak_smoke.py <中文wav>     # 说：识别 + 翻译 + 语音合成（写到 WAV）
+native/build.sh                           # 交叉编译 rtt-capture.exe
 ```
 
-代码结构：`rtt/audio.py` 采集，`rtt/asr.py` 双遍识别，`rtt/translate.py` 翻译，`rtt/pipeline.py` 串联，`rtt/ui/` 界面。
+代码结构：`rtt/audio.py` 采集，`rtt/apps.py` 按程序录音，`rtt/asr.py` 双遍识别，`rtt/translate.py` 翻译，`rtt/tts.py` 语音合成，`rtt/pipeline.py` 听，`rtt/speak.py` 说，`rtt/chat.py` + `rtt/ocr_worker.py` 聊天框，`rtt/scenes.py` 场景，`rtt/ui/` 界面。

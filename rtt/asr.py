@@ -133,6 +133,12 @@ class AsrEngine:
         self.last_text = _tidy(self.online.get_result(self.stream)) or self.last_text
         self._finalize()
 
+    def end_utterance(self) -> None:
+        """按键说话松开时调用：立刻把这句话定稿，并准备好接收下一句。"""
+        if self.seg_audio:
+            self.flush()
+        self.stream = self.online.create_stream()
+
     def _finalize(self) -> None:
         text = self.last_text
         if text and self.offline is not None and self.seg_audio:

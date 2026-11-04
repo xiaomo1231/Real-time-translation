@@ -1,0 +1,13 @@
+[package]
+name = "rtt-capture"
+version = "0.2.0"
+edition = "2021"
+description = "按进程录制 Windows 程序的声音（WASAPI 进程回环），输出 16kHz 单声道 f32 到 stdout"
+
+[dependencies]
+wasapi = "0.26"
+
+[profile.release]
+opt-level = "s"
+strip = true
+lto = true

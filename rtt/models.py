@@ -12,7 +12,7 @@ from typing import Callable
 from .config import data_dir
 
 HF = "https://huggingface.co/csukuangfj/{repo}/resolve/main/{file}"
-GH = "https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/{repo}.tar.bz2"
+GH = "https://github.com/k2-fsa/sherpa-onnx/releases/download/{tag}/{repo}.tar.bz2"
 
 
 @dataclass(frozen=True)
@@ -22,6 +22,8 @@ class ModelSpec:
     files: tuple[str, ...]
     size_mb: int
     title: str
+    tag: str = "asr-models"
+    tarball_only: bool = False  # 含 espeak-ng-data 等目录的模型只能整包下载
 
 
 MODELS = {
@@ -50,6 +52,24 @@ MODELS = {
         ("model.int8.onnx", "tokens.txt"),
         229,
         "SenseVoice 定稿模型",
+    ),
+    "piper": ModelSpec(
+        "piper",
+        "vits-piper-en_US-lessac-medium",
+        ("en_US-lessac-medium.onnx", "tokens.txt", "espeak-ng-data/phontab"),
+        79,
+        "Piper 英文语音",
+        tag="tts-models",
+        tarball_only=True,
+    ),
+    "kokoro": ModelSpec(
+        "kokoro",
+        "kokoro-int8-multi-lang-v1_1",
+        ("model.int8.onnx", "voices.bin", "tokens.txt", "lexicon-us-en.txt", "espeak-ng-data/phontab"),
+        207,
+        "Kokoro 语音（更自然，需要强 CPU）",
+        tag="tts-models",
+        tarball_only=True,
     ),
 }
 
@@ -116,6 +136,11 @@ def ensure_model(key: str, progress: Progress | None = None) -> Path:
     if is_ready(key):
         return target
     target.mkdir(parents=True, exist_ok=True)
+    if spec.tarball_only:
+        _download_tarball(spec, target, progress, everything=True)
+        if not is_ready(key):
+            raise RuntimeError(f"模型下载不完整：{spec.title}")
+        return target
     try:
         for name in spec.files:
             dest = target / name
@@ -128,8 +153,8 @@ def ensure_model(key: str, progress: Progress | None = None) -> Path:
     return target
 
 
-def _download_tarball(spec: ModelSpec, target: Path, progress: Progress | None) -> None:
-    url = GH.format(repo=spec.repo)
+def _download_tarball(spec: ModelSpec, target: Path, progress: Progress | None, everything: bool = False) -> None:
+    url = GH.format(tag=spec.tag, repo=spec.repo)
     req = urllib.request.Request(url, headers={"User-Agent": "rtt/0.1"})
     wanted = {f"{spec.repo}/{f}": f for f in spec.files}
     with urllib.request.urlopen(req, timeout=30) as r:
@@ -147,9 +172,17 @@ def _download_tarball(spec: ModelSpec, target: Path, progress: Progress | None) 
                 return b
 
         with tarfile.open(fileobj=Counter(r), mode="r|bz2") as tar:
+            prefix = spec.repo + "/"
             for member in tar:
-                name = wanted.get(member.name)
+                if everything and member.name.startswith(prefix) and member.isfile():
+                    rel = member.name[len(prefix):]
+                    if ".." in Path(rel).parts or rel.startswith("/"):
+                        continue
+                    name = rel
+                else:
+                    name = wanted.get(member.name)
                 if name and member.isfile():
+                    (target / name).parent.mkdir(parents=True, exist_ok=True)
                     src = tar.extractfile(member)
                     with open(target / name, "wb") as out:
                         while chunk := src.read(1 << 20):

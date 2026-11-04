@@ -15,7 +15,7 @@ from .asr import AsrEngine, Segment
 from .audio import AudioSource
 from .config import Settings
 from .transcript import Transcript
-from .translate import TranslationEvent, Translator
+from .translate import TranslationEvent, Translator, target_language
 
 
 @dataclass
@@ -44,6 +44,7 @@ class Pipeline:
         self.translator: Translator | None = None
         self.transcript: Transcript | None = None
         self.engine: AsrEngine | None = None
+        self.speaker = None  # 面对面模式：把英文译文从音箱念出来
 
     def start(self) -> None:
         self._stop.clear()
@@ -71,6 +72,9 @@ class Pipeline:
             if ev.first_token_ms:
                 self.stats.translate_first_token_ms.append(ev.first_token_ms)
             self.transcript.set_translation(ev.seg_id, ev.text)
+            item = self.transcript.items.get(ev.seg_id)
+            if self.speaker and ev.text and item and target_language(item["src"]) == "en":
+                self.speaker.say(ev.text)
             if ev.error:
                 self.cb.error(ev.error)
         self.cb.translation(ev)
@@ -90,7 +94,17 @@ class Pipeline:
             self.transcript = Transcript(self.cfg.save_transcript)
             self.translator = Translator(self.cfg, self._on_translation)
             if self.source is None:
-                self.source = AudioSource(self.cfg.source, self.cfg.device_name)
+                if self.cfg.source == "apps":
+                    from .apps import AppAudioSource
+
+                    self.source = AppAudioSource(self.cfg.listen_apps)
+                else:
+                    self.source = AudioSource(self.cfg.source, self.cfg.device_name)
+            if self.cfg.read_aloud:
+                from .tts import Speaker
+
+                self.cb.status("正在加载语音合成…")
+                self.speaker = Speaker(self.cfg, [""], on_error=self.cb.error)
             self.source.start()
             tip = "" if self.translator.enabled else "（未设置 API Key，只显示原文）"
             self.cb.status(f"正在收听 · {self.source.description}{tip}")
@@ -103,7 +117,14 @@ class Pipeline:
                     continue
                 samples, rate = got
                 silence_rate = rate
+                if self.speaker is not None and self.speaker.speaking:
+                    # 自己正在念译文：麦克风会录到，送静音避免把它再识别一遍
+                    samples = np.zeros_like(samples)
                 self.engine.feed(samples, rate)
+                err = getattr(self.source, "last_error", "")
+                if err:
+                    self.source.last_error = ""
+                    self.cb.error(err)
             self.engine.flush()
         except Exception as e:
             traceback.print_exc()
@@ -111,6 +132,8 @@ class Pipeline:
         finally:
             if self.source:
                 self.source.stop()
+            if self.speaker:
+                self.speaker.stop()
             if self.translator:
                 time.sleep(0.1)
                 self.translator.stop()

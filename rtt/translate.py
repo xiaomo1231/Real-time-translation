@@ -30,7 +30,11 @@ SYSTEM_PROMPT = """你是专业的同声传译，正在为视频会议、网课�
 1. 把用户发来的字幕片段翻译成{target}，只输出译文，不要解释、不要加引号。
 2. 片段来自语音识别，可能有错别字、口语重复或句子不完整：按最可能的意思翻译，不完整的句子就译成不完整的句子，不要补全。
 3. 专有名词、人名、产品名保留常见译法；中英夹杂时整体译成{target}。
-4. 语气自然、简洁，符合字幕阅读习惯。{glossary}"""
+4. 语气自然、简洁，符合字幕阅读习惯。{spoken}{glossary}"""
+
+SPOKEN_RULE = "\n5. 译文会被合成语音念给对方听：用自然的口语，句子短，不要括号、表情和特殊符号。"
+
+LANG_NAMES = {"en": "英文", "zh": "简体中文", "ja": "日文", "ko": "韩文", "fr": "法文", "de": "德文", "es": "西班牙文", "ru": "俄文"}
 
 
 @dataclass
@@ -45,8 +49,17 @@ class TranslationEvent:
 class Translator:
     """后台线程按顺序翻译定稿分句，流式回调译文。"""
 
-    def __init__(self, cfg: Settings, on_event: Callable[[TranslationEvent], None]):
+    def __init__(
+        self,
+        cfg: Settings,
+        on_event: Callable[[TranslationEvent], None],
+        target: str | None = None,
+        spoken: bool = False,
+    ):
+        """target=None 时自动判断方向（中文→英文，其他→中文）；spoken=True 时译文偏口语，用于朗读。"""
         self.cfg = cfg
+        self.target = target
+        self.spoken = spoken
         self.on_event = on_event
         self.q: queue.Queue = queue.Queue()
         self.history: deque = deque(maxlen=max(0, cfg.context_pairs))
@@ -66,17 +79,31 @@ class Translator:
     def submit(self, seg_id: int, text: str) -> None:
         self.q.put((seg_id, text))
 
+    def translate_now(self, text: str) -> str:
+        """同步翻译一段文字（打字翻译框用），出错时抛异常。"""
+        last: Exception | None = None
+        for client, model in self.clients:
+            try:
+                r = client.chat.completions.create(model=model, messages=self._messages(text), temperature=0.3, max_tokens=512)
+                out = (r.choices[0].message.content or "").strip()
+                self.history.append((text, out))
+                return out
+            except Exception as e:
+                last = e
+        raise RuntimeError(str(last) if last else "未设置 API Key")
+
     def stop(self) -> None:
         self._stop.set()
         self.q.put(None)
 
     def _messages(self, text: str) -> list[dict]:
-        target = "英文" if target_language(text) == "en" else "简体中文"
+        code = self.target or target_language(text)
+        target = LANG_NAMES.get(code, code)
         pairs = self.cfg.glossary_pairs()
         glossary = ""
         if pairs:
             glossary = "\n术语表（必须使用）：\n" + "\n".join(f"- {a} → {b}" for a, b in pairs)
-        msgs = [{"role": "system", "content": SYSTEM_PROMPT.format(target=target, glossary=glossary)}]
+        msgs = [{"role": "system", "content": SYSTEM_PROMPT.format(target=target, glossary=glossary, spoken=SPOKEN_RULE if self.spoken else "")}]
         for src, dst in self.history:
             msgs.append({"role": "user", "content": src})
             msgs.append({"role": "assistant", "content": dst})

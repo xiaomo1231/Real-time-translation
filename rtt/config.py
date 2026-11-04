@@ -35,9 +35,34 @@ class Settings:
     context_pairs: int = 3
     glossary: str = ""  # 每行一条：原文=译文
 
-    # 音频
-    source: str = "system"  # system | mic
+    # 场景：meeting | game | call | face（见 rtt/scenes.py）
+    scene: str = "meeting"
+
+    # 听：音频来源
+    source: str = "system"  # system | apps | mic
     device_name: str = ""  # 空 = 系统默认设备
+    listen_apps: list[str] = field(default_factory=lambda: ["Discord.exe"])  # source=apps 时录这些程序
+
+    # 说：按键说中文，合成英文语音输出到虚拟麦克风
+    speak_enabled: bool = False
+    speak_mode: str = "ptt"  # ptt（按住说话）| auto（自动断句）
+    ptt_key: str = "f8"
+    speak_mic: str = ""  # 空 = 默认麦克风
+    speak_target: str = "en"
+    speak_output: str = "CABLE Input"  # 输出设备名包含这段文字即可
+    speak_monitor: bool = False  # 同时在耳机里播放
+    tts_voice: str = "piper"  # piper | kokoro
+    tts_speed: float = 1.05
+    read_aloud: bool = False  # 面对面：把听到的中文译成英文后从音箱念出来
+
+    # 打字翻译框
+    type_hotkey: str = "<ctrl>+<alt>+t"
+    type_speak: bool = False  # 译文同时念到虚拟麦克风
+
+    # 聊天框文字识别
+    ocr_enabled: bool = False
+    ocr_region: list[int] = field(default_factory=list)  # [x, y, w, h]，屏幕像素
+    ocr_interval: float = 1.0
 
     # 识别
     tier: str = "auto"  # auto | high | low

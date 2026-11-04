@@ -14,6 +14,14 @@ jobs:
           python-version: "3.12"
       - run: python -m pip install -r requirements.txt
       - name: Import all modules
-        run: python -c "import rtt.app, rtt.audio, rtt.asr, rtt.translate, rtt.pipeline, pyaudiowpatch; print('ok')"
+        run: python -c "import rtt.app, rtt.audio, rtt.asr, rtt.translate, rtt.pipeline, rtt.speak, rtt.tts, rtt.apps, rtt.chat, rtt.scenes, rtt.ui.tools, pyaudiowpatch, pycaw, rapidocr_onnxruntime, mss; print('ok')"
       - name: Byte-compile
         run: python -m compileall -q rtt main.py
+
+  capture-helper:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build rtt-capture
+        working-directory: native/rtt-capture
+        run: cargo build --release
