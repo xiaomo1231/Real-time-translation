@@ -120,8 +120,11 @@ class SettingsDialog(QDialog):
         for name in audio.list_devices("mic"):
             self.speak_mic.addItem(name or "系统默认", name)
         self.speak_mic.setCurrentIndex(max(0, self.speak_mic.findData(cfg.speak_mic)))
-        self.speak_out = QLineEdit(cfg.speak_output)
-        self.speak_out.setPlaceholderText("输出设备名包含的文字，VB-CABLE 为 CABLE Input")
+        self.speak_out = QComboBox()
+        self.speak_out.setEditable(True)
+        self.speak_out.addItems(audio.list_output_devices())
+        self.speak_out.setCurrentText(cfg.speak_output)
+        self.speak_out.lineEdit().setPlaceholderText("选择或输入设备名的一部分，例如 CABLE Input、Playback 3/4")
         self.monitor = QCheckBox("同时在耳机里播放（听自己发出的英文）")
         self.monitor.setChecked(cfg.speak_monitor)
         self.voice = _combo([("Piper 英文（快，推荐）", "piper"), ("Kokoro（更自然，需要强 CPU）", "kokoro")], cfg.tts_voice)
@@ -137,8 +140,9 @@ class SettingsDialog(QDialog):
         f.addRow("声音", self.voice)
         f.addRow("语速", self.tts_speed)
         f.addRow(QLabel(
-            "使用前先安装免费的 VB-CABLE 虚拟声卡（vb-audio.com/Cable），\n"
-            "然后在游戏 / Discord 里把麦克风设为「CABLE Output」。\n"
+            "英文语音要送进游戏 / Discord 的麦克风，二选一：\n"
+            "· 有内录（回环）功能的声卡：输出到一个会被内录的播放通道，游戏麦克风选这块声卡\n"
+            "· 没有：安装免费的 VB-CABLE（vb-audio.com/Cable），输出到 CABLE Input，游戏麦克风选 CABLE Output\n"
             "注意：Piper 只会说英文；翻译成其他语言时请改用 Kokoro，发音也可能不准。"
         ))
         tabs.addTab(t, "说")
@@ -272,7 +276,7 @@ class SettingsDialog(QDialog):
         c.ptt_key = self.ptt_key.text().strip().lower() or "f8"
         c.speak_mic = self.speak_mic.currentData() or ""
         c.speak_target = self.speak_target.currentData()
-        c.speak_output = self.speak_out.text().strip()
+        c.speak_output = self.speak_out.currentText().strip()
         c.speak_monitor = self.monitor.isChecked()
         c.tts_voice = self.voice.currentData()
         c.tts_speed = round(self.tts_speed.value(), 2)

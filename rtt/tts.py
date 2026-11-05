@@ -79,7 +79,7 @@ class AudioOut:
                     self.device, self.name = i, d["name"]
                     break
             if self.device is None:
-                raise RuntimeError(f"找不到输出设备「{name_contains}」。说话转译需要先安装 VB-CABLE 虚拟声卡")
+                raise RuntimeError(f"找不到输出设备「{name_contains}」，请在「设置 → 说 → 输出到」里重新选择")
         info = sd.query_devices(self.device, "output")
         self.rate = int(info["default_samplerate"])
         self.stream = sd.OutputStream(device=self.device, samplerate=self.rate, channels=1, dtype="float32")

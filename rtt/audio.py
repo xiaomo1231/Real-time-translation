@@ -54,6 +54,20 @@ def list_devices(kind: str) -> list[str]:
     return names
 
 
+def list_output_devices() -> list[str]:
+    """可以播放声音的设备名（去重），用于「说 → 输出到」。"""
+    names: list[str] = []
+    try:
+        import sounddevice as sd
+
+        for d in sd.query_devices():
+            if d["max_output_channels"] > 0 and d["name"] not in names:
+                names.append(d["name"])
+    except Exception:
+        pass
+    return names
+
+
 class AudioSource:
     """start() 后，read() 返回 (samples, sample_rate)；超时返回 None。"""
 
